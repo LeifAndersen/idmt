@@ -2,8 +2,7 @@
 
 (provide (all-defined-out))
 
-(require "lang.rkt"
-         (for-syntax racket/base))
+(require "lang.rkt")
 
 (define-base-editor* base$
   (super-new)

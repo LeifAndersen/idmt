@@ -73,7 +73,9 @@
                                    `(racket/base
                                      racket/class
                                      racket/serialize
-                                     editor/lang))
+                                     ;"lang.rkt"
+                                     editor/lang
+                                     ))
      #:with (state:defstate ...) (editor-syntax-introduce #'(plain-state ...))
      #`(begin
          (editor-submod
