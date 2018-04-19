@@ -9,11 +9,7 @@
                      racket/function
                      syntax/parse))
 
-;; ===================================================================================================
-
 (define-for-syntax editor-syntax-introduce (make-syntax-introducer))
-
-;; ===================================================================================================
 
 (define-syntax-parameter define-state
   (syntax-parser
