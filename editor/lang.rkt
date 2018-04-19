@@ -3,31 +3,13 @@
 (provide (all-defined-out))
 
 (require racket/class
-         racket/serialize
          racket/stxparam
          racket/splicing
-         syntax/location
-         syntax/parse/define
          (for-syntax racket/base
-                     racket/match
                      racket/function
-                     racket/require-transform
-                     racket/provide-transform
                      racket/syntax
                      syntax/parse
-                     syntax/parse/lib/function-header
-                     syntax/location
-                     racket/serialize))
-
-;; To be able to instantiate the found editors, we need each
-;; module to be able to track the editors created in its
-;; (partially defined) file.
-(module key-submod racket/base
-  ;(#%declare #:cross-phase-persistent)
-  (provide editor-list-key editor-mixin-list-key)
-  (define editor-list-key 'editor-list-cmark-key)
-  (define editor-mixin-list-key 'editor-mixin-list-cmark-key))
-(require (for-syntax 'key-submod))
+                     syntax/location))
 
 ;; ===================================================================================================
 
@@ -85,12 +67,11 @@
 ;; 3. A deserializer submodule
 (define-syntax (~define-editor stx)
   (syntax-parse stx
-    [(_ orig-stx name:id supclass (interfaces ...)
+    [(_ orig-stx name:id supclass
         (~and
          (~seq (~or plain-state:defstate
                     internal-body) ...)
          (~seq body ...)))
-     #:with (marked-interfaces ...) (editor-syntax-introduce #'(interfaces ...))
      #:with (marked-body ...) (editor-syntax-introduce #'(body ...))
      #:with (marked-reqs ...) (map (compose editor-syntax-introduce (curry datum->syntax #'name))
                                    `(racket/base
@@ -115,8 +96,7 @@
                 (class/derived
                  orig-stx
                  (name
-                  marked-supclass
-                  (marked-interfaces ...)
+                  marked-supclass ()
                   #f)
                  marked-body ...))))))]))
 
