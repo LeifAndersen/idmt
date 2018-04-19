@@ -5,6 +5,6 @@
 (require "lang.rkt"
          (for-syntax racket/base))
 
-(define-base-editor* base$ object%
+(define-base-editor* base$
   (super-new)
   (define-state content #f))

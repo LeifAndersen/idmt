@@ -61,13 +61,9 @@
      (quasisyntax/loc stx
        (defstate-parameter #,stx define-state))]))
 
-;; Each editor definition has three parts:
-;; 1. A phase 1 elaboration
-;; 2. A submodule with interaction code
-;; 3. A deserializer submodule
-(define-syntax (~define-editor stx)
+(define-syntax (define-base-editor* stx)
   (syntax-parse stx
-    [(_ orig-stx name:id supclass
+    [(_ name:id
         (~and
          (~seq (~or plain-state:defstate
                     internal-body) ...)
@@ -78,10 +74,7 @@
                                      racket/class
                                      racket/serialize
                                      editor/lang))
-     #:with marked-supclass (editor-syntax-introduce #'supclass)
      #:with (state:defstate ...) (editor-syntax-introduce #'(plain-state ...))
-     (define state-methods (for/list ([i (in-list (attribute state.getter))])
-                             (gensym (syntax->datum i))))
      #`(begin
          (editor-submod
           (require marked-reqs ...)
@@ -94,13 +87,6 @@
             (define name
               (let ()
                 (class/derived
-                 orig-stx
-                 (name
-                  marked-supclass ()
-                  #f)
+                 #,stx
+                 (name object% () #f)
                  marked-body ...))))))]))
-
-(define-syntax (define-base-editor* stx)
-  (syntax-parse stx
-    [(_ name:id super (interfaces ...) body ...)
-     #`(~define-editor #,stx name super (interfaces ...) body ...)]))
