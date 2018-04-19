@@ -220,8 +220,8 @@
                              (gensym (syntax->datum i))))
      #`(begin
          (editor-submod
-           (require marked-reqs ...)
-           (#%require #,(quote-module-path))
+          (require marked-reqs ...)
+          (#%require #,(quote-module-path))
           (splicing-syntax-parameterize ([defstate-parameter
                                            (syntax-parser
                                              [(_ st:defstate who)
