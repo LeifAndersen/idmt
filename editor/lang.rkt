@@ -1,7 +1,6 @@
 #lang racket/base
 
-(provide (all-defined-out)
-         (for-syntax current-editor-base-lang))
+(provide (all-defined-out))
 
 (require racket/class
          racket/serialize
@@ -32,12 +31,6 @@
 
 ;; ===================================================================================================
 
-;; Because we use lang in building the stdlib, which is exported
-;; as part of the lang, we want to use racket/base to bootstrap
-;; that language.
-(define-for-syntax current-editor-base-lang (make-parameter 'editor))
-;(define-for-syntax current-editor-base-lang (make-parameter 'racket/base))
-
 (define-for-syntax editor-syntax-introduce (make-syntax-introducer))
 
 ;; Creates a box for storing submodule syntax pieces.
@@ -66,116 +59,6 @@
          #,@(map syntax-local-introduce (reverse (unbox editor-submod-box))))]))
 
 ;; ===================================================================================================
-
-;; We want to require edit-time code into the modules editor submod.
-(define-syntax (~require stx)
-  (syntax-parse stx
-    [(_ body ...)
-     (for ([i (in-list (attribute body))])
-       (define-values (imports import-sources) (expand-import i))
-       (for ([s (in-list import-sources)])
-         (match-define (struct* import-source ([mod-path-stx mod-path]
-                                               [mode phase]))
-           s)
-         (define/syntax-parse maybe-require-submod
-           ((make-syntax-introducer) (format-id #f "maybe-require-submod")))
-         (syntax-local-lift-module-end-declaration
-          #`(begin
-              (define-syntax-parser maybe-require-submod
-                [(_)
-                 (when (module-declared? (convert-relative-module-path '(from-editor #,mod-path)) #t)
-                   (syntax-local-lift-module-end-declaration
-                    #'(~require (for-editor (for-meta #,phase (from-editor #,mod-path))))))
-                 #'(begin)])
-              (maybe-require-submod)))))
-     #'(require body ...)]))
-
-;; Since the editor submodule is a language detail, we want
-;; a dedicated for-editor require subform.
-(begin-for-syntax
-  (struct for-editor-struct ()
-    #:property prop:require-transformer
-    (λ (str)
-      (λ (stx)
-        (syntax-parse stx
-          [(_ name ...)
-           #:with (marked-name ...) (editor-syntax-introduce #'(name ...))
-           #:with r/b (editor-syntax-introduce (format-id stx "racket/base"))
-           (syntax-local-lift-module-end-declaration
-            #`(editor-submod
-               (require r/b marked-name ...)))])
-        (values '() '())))
-    #:property prop:provide-pre-transformer
-    (λ (str)
-      (λ (stx mode)
-        (syntax-parse stx
-          [(_ name ...)
-           (syntax-local-lift-module-end-declaration
-            #`(editor-submod
-               (provide name ...)))
-           #'(for-editor name ...)])))
-    #:property prop:provide-transformer
-    (λ (str)
-      (λ (stx mode)
-        (syntax-parse stx
-          [(_ name ...)
-           '()])))))
-
-(define-syntax for-editor (for-editor-struct))
-
-;; Just as for-editor is similar to for-syntax, for-elaborator
-;; is similar to for-template. It lets helper modules bring in
-;; editor components from another module.
-(begin-for-syntax
-  (struct from-editor-struct ()
-    #:property prop:require-transformer
-    (λ (str)
-      (λ (stx)
-        (syntax-parse stx
-          [(_ name ...)
-           (for/fold ([i-list '()]
-                      [is-list '()])
-                     ([n (in-list (attribute name))])
-             ;; XXX This NEEDS a proper from-editor implementation.
-             (define-values (i is)
-               (expand-import #`(submod #,n editor)))
-             (values (append i i-list)
-                     (append is is-list)))])))))
-
-(define-syntax from-editor (from-editor-struct))
-
-(define-syntax (begin-for-editor stx)
-  (syntax-parse stx
-    [(_ code ...)
-     #:with baselang (editor-syntax-introduce (datum->syntax stx (current-editor-base-lang)))
-     #:with (marked-code ...) (editor-syntax-introduce #'(code ...))
-     (syntax/loc stx
-       (editor-submod
-        (require baselang)
-        marked-code ...))]))
-
-(define-syntax (define-for-editor stx)
-  (syntax-parse stx
-    [(_ name:id body)
-     (syntax/loc stx
-       (begin-for-editor
-         (define name body)))]
-    [(_ name:function-header body)
-     (syntax/loc stx
-       (begin-for-editor
-         (define name body)))]))
-
-;; ===================================================================================================
-
-;; Only introduced by #editor reader macro. Handles deserializing
-;;  the editor.
-(define-syntax (#%editor stx)
-  (syntax-parse stx
-    [(_ (elaborator-binding elaborator-name) body)
-     (define/syntax-parse elaborator
-       (syntax-local-lift-require (deserialize (syntax->datum #'elaborator-binding))
-                                  (datum->syntax #f (syntax->datum #'elaborator-name))))
-     #'(elaborator body)]))
 
 (begin-for-syntax
   (define-syntax-class defstate
@@ -210,7 +93,7 @@
      #:with (marked-interfaces ...) (editor-syntax-introduce #'(interfaces ...))
      #:with (marked-body ...) (editor-syntax-introduce #'(body ...))
      #:with (marked-reqs ...) (map (compose editor-syntax-introduce (curry datum->syntax #'name))
-                                   `(,(current-editor-base-lang)
+                                   `(racket/base
                                      racket/class
                                      racket/serialize
                                      editor/lang))
@@ -229,17 +112,12 @@
                                                   (define st.marked-name st.body (... ...)))])])
             (define name
               (let ()
-                #,@(for/list ([sm (in-list state-methods)])
-                     #`(define-local-member-name #,sm))
                 (class/derived
                  orig-stx
                  (name
                   marked-supclass
                   (marked-interfaces ...)
                   #f)
-                 #,@(for/list ([i (in-list (attribute state.marked-name))]
-                               [sm (in-list state-methods)])
-                      #`(define/public (#,sm) #,i))
                  marked-body ...))))))]))
 
 (define-syntax (define-base-editor* stx)
