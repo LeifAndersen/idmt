@@ -178,9 +178,6 @@
      #'(elaborator body)]))
 
 (begin-for-syntax
-  (define-syntax-class defelaborate
-    #:literals (define-elaborate)
-    (pattern (define-elaborate data body ...+)))
   (define-syntax-class defstate
     #:literals (define-state)
     (pattern (define-state marked-name:id body ...)
@@ -193,21 +190,11 @@
     [(_ stx who)
      (raise-syntax-error (syntax->datum #'who) "Use outside of define-editor is an error" this-syntax)]))
 
-(define-syntax define-elaborate
-  (syntax-parser
-    [de:defelaborate
-     (raise-syntax-error 'define-elaborate "Use outside of define-editor is an error" this-syntax)]))
-
 (define-syntax (define-state stx)
   (syntax-parse stx
     [x:defstate
      (quasisyntax/loc stx
        (defstate-parameter #,stx define-state))]))
-
-;; We don't want to get editor classes when
-;; deserializing new editors.
-(define deserialize-editor-classes?
-  (make-parameter #t))
 
 ;; Each editor definition has three parts:
 ;; 1. A phase 1 elaboration
@@ -218,13 +205,8 @@
     [(_ orig-stx name:id supclass (interfaces ...)
         (~and
          (~seq (~or plain-state:defstate
-                    (~optional elaborator:defelaborate
-                               #:defaults ([elaborator.data #'this]
-                                           [(elaborator.body 1) (list #'this)]))
                     internal-body) ...)
          (~seq body ...)))
-     #:with elaborator-name (format-id stx "~a:elaborate" #'name)
-     #:with name-deserialize (format-id stx "~a:deserialize" #'name)
      #:with (marked-interfaces ...) (editor-syntax-introduce #'(interfaces ...))
      #:with (marked-body ...) (editor-syntax-introduce #'(body ...))
      #:with (marked-reqs ...) (map (compose editor-syntax-introduce (curry datum->syntax #'name))
@@ -234,19 +216,9 @@
                                      editor/lang))
      #:with marked-supclass (editor-syntax-introduce #'supclass)
      #:with (state:defstate ...) (editor-syntax-introduce #'(plain-state ...))
-     (define serialize-method (gensym 'serialize))
-     (define deserialize-method (gensym 'deserialize))
-     (define copy-method (gensym 'copy))
-     (define elaborator-method (gensym 'elaborator))
      (define state-methods (for/list ([i (in-list (attribute state.getter))])
                              (gensym (syntax->datum i))))
      #`(begin
-         (define-syntax (elaborator-name stx)
-           (syntax-parse stx
-             [(_ data)
-              #'(let ()
-                  (define elaborator.data (deserialize 'data))
-                  elaborator.body ...)]))
          (editor-submod
            (require marked-reqs ...)
            (#%require #,(quote-module-path))
