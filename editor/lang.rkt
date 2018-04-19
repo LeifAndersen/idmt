@@ -15,24 +15,10 @@
 
 ;; ===================================================================================================
 
-(begin-for-syntax
-  (define-syntax-class defstate
-    #:literals (define-state)
-    (pattern (define-state marked-name:id body ...)
-             #:attr name (editor-syntax-introduce (attribute marked-name)))))
-
-(define-syntax-parameter defstate-parameter
+(define-syntax-parameter define-state
   (syntax-parser
-    [(_ stx who)
-     (raise-syntax-error (syntax->datum #'who)
-                         "Use outside of define-editor is an error"
-                         this-syntax)]))
-
-(define-syntax (define-state stx)
-  (syntax-parse stx
-    [x:defstate
-     (quasisyntax/loc stx
-       (defstate-parameter #,stx define-state))]))
+    [(define-state marked-name:id body ...)
+     (raise-syntax-error 'define-state "Use outside of define-editor is an error" this-syntax)]))
 
 (define-syntax (define-base-editor* stx)
   (syntax-parse stx
@@ -41,16 +27,12 @@
      #:with (marked-reqs ...) (map (compose editor-syntax-introduce (curry datum->syntax #'name))
                                    `(racket/base
                                      racket/class
-                                     racket/serialize
                                      editor/lang))
      #`(begin
          (require marked-reqs ...)
-         (splicing-syntax-parameterize ([defstate-parameter
+         (splicing-syntax-parameterize ([define-state
                                           (syntax-parser
-                                            [(_ st:defstate who) #'(begin)])])
+                                            [(_ st who) #'(begin)])])
            (define name
              (let ()
-               (class/derived
-                #,stx
-                (name object% () #f)
-                marked-body ...)))))]))
+               (class/derived #,stx (name object% () #f) marked-body ...)))))]))
