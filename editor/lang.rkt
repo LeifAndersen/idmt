@@ -216,9 +216,6 @@
 (define-syntax (~define-editor stx)
   (syntax-parse stx
     [(_ orig-stx name:id supclass (interfaces ...)
-        (~or (~optional (~seq #:base? b?) #:defaults ([b? #'#f]))
-             (~optional (~seq #:direct-deserialize? dd?) #:defaults ([dd? #'#t])))
-        ...
         (~and
          (~seq (~or plain-state:defstate
                     (~optional elaborator:defelaborate
@@ -237,36 +234,22 @@
                                      editor/lang))
      #:with marked-supclass (editor-syntax-introduce #'supclass)
      #:with (state:defstate ...) (editor-syntax-introduce #'(plain-state ...))
-     (define dd?* (syntax-e #'dd?))
-     (unless (or (not dd?*) (eq? 'module-begin (syntax-local-context)) (eq? 'module (syntax-local-context)))
-       (raise-syntax-error #f "Must be defined at the module level" #'orig-stx))
      (define serialize-method (gensym 'serialize))
      (define deserialize-method (gensym 'deserialize))
      (define copy-method (gensym 'copy))
      (define elaborator-method (gensym 'elaborator))
      (define state-methods (for/list ([i (in-list (attribute state.getter))])
                              (gensym (syntax->datum i))))
-     (define base? (syntax-e (attribute b?)))
      #`(begin
-         #,@(if dd?*
-                (list #'(provide elaborator-name)
-                      #'(begin-for-syntax
-                          (let ()
-                            (define b (continuation-mark-set-first #f editor-list-key))
-                            (when (and b (box? b))
-                              (set-box! b (cons #'name (unbox b)))))))
-                '())
          (define-syntax (elaborator-name stx)
            (syntax-parse stx
              [(_ data)
               #'(let ()
                   (define elaborator.data (deserialize 'data))
                   elaborator.body ...)]))
-         (#,@(if dd?*
-                 #`(editor-submod
-                    (require marked-reqs ...)
-                    (#%require #,(quote-module-path)))
-                 #'(begin))
+         (editor-submod
+           (require marked-reqs ...)
+           (#%require #,(quote-module-path))
           (splicing-syntax-parameterize ([defstate-parameter
                                            (syntax-parser
                                              [(_ st:defstate who)
@@ -290,4 +273,4 @@
 (define-syntax (define-base-editor* stx)
   (syntax-parse stx
     [(_ name:id super (interfaces ...) body ...)
-     #`(~define-editor #,stx name super (interfaces ...) #:base? #t body ...)]))
+     #`(~define-editor #,stx name super (interfaces ...) body ...)]))
