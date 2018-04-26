@@ -1,6 +1,6 @@
 (module f racket/base
   (#%plain-module-begin
-   (provide (for-editor (all-from-out "stdlib.rkt" (from-editor "stdlib.rkt"))))
+   (provide (for-editor (all-from-out (submod "stdlib.rkt" editor))))
    (require "lang.rkt"
             (for-editor "lang.rkt"
-                        (from-editor "stdlib.rkt")))))
+                        (submod "stdlib.rkt" editor)))))

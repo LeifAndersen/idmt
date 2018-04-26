@@ -8,16 +8,6 @@
                      racket/syntax
                      syntax/parse))
 
-;; To be able to instantiate the found editors, we need each
-;; module to be able to track the editors created in its
-;; (partially defined) file.
-(module key-submod racket/base
-  ;(#%declare #:cross-phase-persistent)
-  (provide editor-list-key editor-mixin-list-key)
-  (define editor-list-key 'editor-list-cmark-key)
-  (define editor-mixin-list-key 'editor-mixin-list-cmark-key))
-(require (for-syntax 'key-submod))
-
 ;; ===================================================================================================
 
 (define-for-syntax editor-syntax-introduce (make-syntax-introducer))
@@ -81,31 +71,3 @@
            '()])))))
 
 (define-syntax for-editor (for-editor-struct))
-
-;; Just as for-editor is similar to for-syntax, for-elaborator
-;; is similar to for-template. It lets helper modules bring in
-;; editor components from another module.
-;; XXX This NEEDS a proper from-editor implementation.
-(begin-for-syntax
-  (struct from-editor-struct ()
-    #:property prop:require-transformer
-    (λ (str)
-      (λ (stx)
-        (syntax-parse stx
-          [(_ name ...)
-           (for/fold ([i-list '()]
-                      [is-list '()])
-                     ([n (in-list (attribute name))])
-             (define-values (i is)
-               (expand-import #`(submod #,n editor)))
-             (values (append i i-list)
-                     (append is is-list)))])))
-    #:property prop:provide-transformer
-    (λ (str)
-      (λ (stx mode)
-        (syntax-parse stx
-          [(_ name ...)
-           (apply append (for/list ([i (in-list (attribute name))])
-                           (expand-export i mode)))])))))
-
-(define-syntax from-editor (from-editor-struct))
