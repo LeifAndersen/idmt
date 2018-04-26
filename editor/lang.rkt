@@ -1,13 +1,9 @@
 #lang racket/base
 
 (provide (all-defined-out))
-
 (require (for-syntax racket/base
                      racket/provide-transform
-                     racket/syntax
                      syntax/parse))
-
-;; ===================================================================================================
 
 (define-syntax for-editor
   (make-provide-pre-transformer
